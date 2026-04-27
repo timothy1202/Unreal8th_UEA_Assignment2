@@ -25,4 +25,8 @@ AShotgun::AShotgun()
 	RecoilPitchMax       = 8.0f;
 	RecoilYawRandom      = 2.5f;
 	CameraShakeIntensity = 3.0f;
+
+    UE_LOG(LogTemp, Log,
+        TEXT("[Shotgun] 생성자 호출 — 샷건 파라미터 적용 (펠릿 %d, 분산 %.1f°)"),
+        PelletCount, SpreadAngle);
 }

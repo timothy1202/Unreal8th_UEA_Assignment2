@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "WeaponBase.generated.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogWeapon, Log, All); 
+    
 UCLASS()
 class GUNS_API AWeaponBase : public AActor
 {

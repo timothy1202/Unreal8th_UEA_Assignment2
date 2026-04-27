@@ -68,49 +68,58 @@ void AGunsCharacter::BeginPlay()
 // ─────────────────────────────────────────────────────────
 void AGunsCharacter::SpawnDefaultWeapon()
 {
-    if (!DefaultWeaponClass) return;
+    if (!DefaultWeaponClass)
+    {
+        UE_LOG(LogTemplateCharacter, Error,
+            TEXT("[Character] DefaultWeaponClass 미설정 — 무기 스폰 실패"));
+        return;
+    }
 
     FActorSpawnParameters Params;
     Params.Owner      = this;
     Params.Instigator = GetInstigator();
 
-    CurrentWeapon = GetWorld()->SpawnActor<AWeaponBase>(
-        DefaultWeaponClass, Params
-    );
+    CurrentWeapon = GetWorld()->SpawnActor<AWeaponBase>(DefaultWeaponClass, Params);
 
     if (CurrentWeapon)
     {
-        // 1인칭 팔 메시의 GripPoint 소켓에 총 부착
         CurrentWeapon->AttachToComponent(
             Mesh1P,
             FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-            TEXT("GripPoint")
-        );
+            TEXT("GripPoint"));
 
-        // 총도 본인만 보이게
         CurrentWeapon->WeaponMesh->SetOnlyOwnerSee(true);
         CurrentWeapon->WeaponMesh->bCastDynamicShadow = false;
+
+        UE_LOG(LogTemplateCharacter, Log,
+            TEXT("[Character] 무기 장착 완료: %s"),
+            *CurrentWeapon->GetName());
+    }
+    else
+    {
+        UE_LOG(LogTemplateCharacter, Error,
+            TEXT("[Character] 무기 스폰 실패"));
     }
 }
 
 // ─────────────────────────────────────────────────────────
-//  반동 추가 — WeaponBase::PerformFire에서 호출
+//  반동 추가
 // ─────────────────────────────────────────────────────────
 void AGunsCharacter::AddRecoil(
     float Strength, float PitchMax, float YawRandom)
 {
-    // 위쪽 반동 누적 (최대값 제한)
-    TargetRecoilPitch = FMath::Clamp(
-        TargetRecoilPitch + Strength,
-        0.0f,
-        PitchMax
-    );
+    float OldPitch = TargetRecoilPitch;
 
-    // 좌우 랜덤 흔들림 (즉시 적용)
+    TargetRecoilPitch = FMath::Clamp(
+        TargetRecoilPitch + Strength, 0.0f, PitchMax);
+
     float Yaw = FMath::RandRange(-YawRandom, YawRandom);
     AddControllerYawInput(Yaw);
-}
 
+    UE_LOG(LogTemplateCharacter, Verbose,
+        TEXT("[Recoil] Pitch: %.2f → %.2f (Max:%.1f) | Yaw랜덤: %.2f"),
+        OldPitch, TargetRecoilPitch, PitchMax, Yaw);
+}
 // ─────────────────────────────────────────────────────────
 //  Tick — 반동 회복 처리
 // ─────────────────────────────────────────────────────────
@@ -181,12 +190,18 @@ void AGunsCharacter::Look(const FInputActionValue& Value)
 
 void AGunsCharacter::StartFire()
 {
-    if (!CurrentWeapon) return;
+    if (!CurrentWeapon)
+    {
+        UE_LOG(LogTemplateCharacter, Warning,
+            TEXT("[Character] StartFire 호출되었으나 무기 없음"));
+        return;
+    }
+
+    UE_LOG(LogTemplateCharacter, Log, TEXT("[Input] StartFire"));
 
     bIsFiring = true;
     CurrentWeapon->Fire();
 
-    // 연사 타이머 (샷건은 FireRate가 길어서 사실상 단발처럼 동작)
     FTimerDelegate FireDelegate = FTimerDelegate::CreateLambda([this]()
     {
         if (bIsFiring && CurrentWeapon)
@@ -194,21 +209,22 @@ void AGunsCharacter::StartFire()
     });
 
     GetWorldTimerManager().SetTimer(
-        AutoFireHandle,
-        FireDelegate,
-        CurrentWeapon->FireRate,
-        true
-    );
+        AutoFireHandle, FireDelegate, CurrentWeapon->FireRate, true);
 }
 
 void AGunsCharacter::StopFire()
 {
+    if (bIsFiring)
+    {
+        UE_LOG(LogTemplateCharacter, Log, TEXT("[Input] StopFire"));
+    }
     bIsFiring = false;
     GetWorldTimerManager().ClearTimer(AutoFireHandle);
 }
 
 void AGunsCharacter::StartReload()
 {
+    UE_LOG(LogTemplateCharacter, Log, TEXT("[Input] StartReload (R키)"));
     if (CurrentWeapon)
         CurrentWeapon->Reload();
 }
