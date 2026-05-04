@@ -33,9 +33,6 @@ void AEnemyCharacter::BeginPlay()
         *GetName(), SightRange, SightAngle, TraceInterval);
 }
 
-// ─────────────────────────────────────────────────────────
-//  매 주기마다 호출 — 비동기 트레이스 "요청"
-// ─────────────────────────────────────────────────────────
 void AEnemyCharacter::RequestAsyncSightTrace()
 {
     UWorld* World = GetWorld();
@@ -81,8 +78,7 @@ void AEnemyCharacter::RequestAsyncSightTrace()
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
     Params.bTraceComplex = true;
-
-    // ★★ 핵심: AsyncLineTraceByChannel ★★
+    
     CurrentTraceHandle = World->AsyncLineTraceByChannel(
         EAsyncTraceType::Single,   // Single / Multi / Test
         EyeLoc,                    // Start
@@ -102,9 +98,8 @@ void AEnemyCharacter::RequestAsyncSightTrace()
         *GetName(), Distance, AngleDeg);
 }
 
-// ─────────────────────────────────────────────────────────
+
 //  비동기 트레이스 결과 콜백 (다음 프레임에 도착)
-// ─────────────────────────────────────────────────────────
 void AEnemyCharacter::OnSightTraceCompleted(
     const FTraceHandle& Handle, FTraceDatum& Data)
 {
@@ -172,9 +167,6 @@ void AEnemyCharacter::OnSightTraceCompleted(
     }
 }
 
-// ─────────────────────────────────────────────────────────
-//  TakeDamage / Die (기존)
-// ─────────────────────────────────────────────────────────
 float AEnemyCharacter::TakeDamage(
     float DamageAmount, FDamageEvent const& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)

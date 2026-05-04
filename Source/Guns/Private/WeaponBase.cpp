@@ -36,9 +36,6 @@ void AWeaponBase::BeginPlay()
         RecoilPitchMax, RecoilYawRandom);
 }
 
-// ─────────────────────────────────────────────────────────
-//  Fire — 발사 진입점
-// ─────────────────────────────────────────────────────────
 void AWeaponBase::Fire()
 {
     if (bIsReloading)
@@ -67,9 +64,6 @@ void AWeaponBase::Fire()
     PerformFire();
 }
 
-// ─────────────────────────────────────────────────────────
-//  PerformFire
-// ─────────────────────────────────────────────────────────
 void AWeaponBase::PerformFire()
 {
     if (!OwnerCharacter)
@@ -117,11 +111,11 @@ void AWeaponBase::PerformFire()
         FCollisionQueryParams QueryParams;
         QueryParams.AddIgnoredActor(this);
         QueryParams.AddIgnoredActor(OwnerCharacter);
-        QueryParams.bTraceComplex = true;
+        QueryParams.bTraceComplex = false;
         QueryParams.bReturnPhysicalMaterial = true;
 
         bool bHit = GetWorld()->LineTraceSingleByChannel(
-            Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
+            Hit, TraceStart, TraceEnd, ECC_Pawn, QueryParams);
 
         DrawDebugLine(GetWorld(), TraceStart,
             bHit ? Hit.ImpactPoint : TraceEnd,
@@ -131,14 +125,18 @@ void AWeaponBase::PerformFire()
         {
             HitCount++;
 
-            UE_LOG(LogWeapon, Verbose,
-                TEXT("  └ 펠릿 #%d 명중: %s | 거리:%.0f | 데미지:%.1f"),
+            UE_LOG(LogWeapon, Warning,
+                TEXT("  └ 펠릿 #%d 명중: %s (Class:%s) | 거리:%.0f | 데미지:%.1f"),
                 i + 1, *Hit.GetActor()->GetName(),
+                *Hit.GetActor()->GetClass()->GetName(),
                 Hit.Distance, Damage);
 
-            UGameplayStatics::ApplyPointDamage(
+            float Applied = UGameplayStatics::ApplyPointDamage(
                 Hit.GetActor(), Damage, Direction, Hit, PC, this,
                 UDamageType::StaticClass());
+
+            UE_LOG(LogWeapon, Warning,
+                TEXT("  └ ApplyPointDamage 반환값: %.1f"), Applied);
 
             if (ImpactEffect)
             {
@@ -182,9 +180,6 @@ void AWeaponBase::PerformFire()
     }
 }
 
-// ─────────────────────────────────────────────────────────
-//  Reload
-// ─────────────────────────────────────────────────────────
 void AWeaponBase::Reload()
 {
     if (bIsReloading)

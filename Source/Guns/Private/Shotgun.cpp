@@ -19,7 +19,7 @@ AShotgun::AShotgun()
 	MagazineSize = 6;
 	ReloadTime   = 3.0f;
 
-	// 반동 (1인칭은 반동이 직접 느껴져서 세게 설정)
+	// 반동
 	RecoilStrength       = 6.0f;
 	RecoilRecoverySpeed  = 4.0f;
 	RecoilPitchMax       = 8.0f;

@@ -152,9 +152,6 @@ void AGunsCharacter::ProcessRecoilRecovery(float DeltaTime)
     }
 }
 
-// ─────────────────────────────────────────────────────────
-//  입력 바인딩
-// ─────────────────────────────────────────────────────────
 void AGunsCharacter::SetupPlayerInputComponent(
     UInputComponent* PlayerInputComponent)
 {
