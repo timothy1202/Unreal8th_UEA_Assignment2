@@ -109,7 +109,43 @@ public:
     ACharacter* OwnerCharacter;
 
 protected:
-    virtual void PerformFire();     // 실제 발사 처리
+    // ================================================
+    //  [템플릿 메서드] 발사 알고리즘의 골격
+    //  → 자식 클래스에서 오버라이드 금지 (final)
+    // ================================================
+    void PerformFire();
+
+    // ------------------------------------------------
+    //  [훅 메서드] 자식 클래스에서 선택적으로 오버라이드
+    // ------------------------------------------------
+
+    /** 발사 직전 호출 — 자식이 선조건/애니메이션 등을 추가할 수 있음 */
+    virtual void OnBeforeFire() {}
+
+    /** 
+     * [순수 가상] 실제 탄환/레이캐스트 처리.
+     * 자식 클래스가 반드시 구현해야 함.
+     * @param PC        발사하는 플레이어 컨트롤러
+     * @param CamLoc    카메라 위치
+     * @param CamRot    카메라 회전
+     * @return          명중한 펠릿 수
+     */
+    virtual int32 DoFireTrace(APlayerController* PC,
+                              const FVector& CamLoc,
+                              const FRotator& CamRot) PURE_VIRTUAL(AWeaponBase::DoFireTrace, return 0;);
+
+    /** 레이캐스트 완료 후 호출 — HitCount를 받아 후처리 가능 */
+    virtual void OnAfterFireTrace(int32 HitCount) {}
+
+    /** 총구 화염·사운드 재생 — 자식이 오버라이드해 다른 이펙트 추가 가능 */
+    virtual void PlayFireEffects(APlayerController* PC);
+
+    /** 반동 적용 — 자식이 오버라이드해 다른 반동 공식 적용 가능 */
+    virtual void ApplyRecoil();
+
+    // ------------------------------------------------
+    //  내부 유틸
+    // ------------------------------------------------
     void OnReloadComplete();
     void ResetFireCooldown();
 

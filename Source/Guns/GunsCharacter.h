@@ -67,6 +67,22 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     UInputAction* ReloadAction;     // 에디터에서 IA_Reload 할당
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    UInputAction* AimAction;        // 에디터에서 IA_Aim 할당 (우클릭)
+
+    // ── 조준(ADS) 설정 ───────────────────────────────────
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Aim")
+    float DefaultFOV = 90.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Aim")
+    float AimFOV = 60.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Aim")
+    float AimInterpSpeed = 10.0f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Aim")
+    bool bIsAiming = false;
+
     // ── 무기 스폰 클래스 ──────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category = "Weapon")
     TSubclassOf<AWeaponBase> DefaultWeaponClass;
@@ -79,6 +95,8 @@ protected:
     void StartFire();
     void StopFire();
     void StartReload();
+    void StartAim();
+    void StopAim();
 
 private:
     void SpawnDefaultWeapon();

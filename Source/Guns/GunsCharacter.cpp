@@ -127,6 +127,15 @@ void AGunsCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     ProcessRecoilRecovery(DeltaTime);
+
+    // ADS FOV 보간
+    if (FirstPersonCameraComponent)
+    {
+        float TargetFOV = bIsAiming ? AimFOV : DefaultFOV;
+        float NewFOV = FMath::FInterpTo(
+            FirstPersonCameraComponent->FieldOfView, TargetFOV, DeltaTime, AimInterpSpeed);
+        FirstPersonCameraComponent->SetFieldOfView(NewFOV);
+    }
 }
 
 void AGunsCharacter::ProcessRecoilRecovery(float DeltaTime)
@@ -166,7 +175,9 @@ void AGunsCharacter::SetupPlayerInputComponent(
     EI->BindAction(FireAction,   ETriggerEvent::Started,   this, &AGunsCharacter::StartFire);
     EI->BindAction(FireAction,   ETriggerEvent::Completed, this, &AGunsCharacter::StopFire);
     EI->BindAction(ReloadAction, ETriggerEvent::Started,   this, &AGunsCharacter::StartReload);
-}
+    EI->BindAction(AimAction,    ETriggerEvent::Started,   this, &AGunsCharacter::StartAim);
+    EI->BindAction(AimAction,    ETriggerEvent::Completed, this, &AGunsCharacter::StopAim);
+    }
 
 void AGunsCharacter::Move(const FInputActionValue& Value)
 {
@@ -224,4 +235,16 @@ void AGunsCharacter::StartReload()
     UE_LOG(LogTemplateCharacter, Log, TEXT("[Input] StartReload (R키)"));
     if (CurrentWeapon)
         CurrentWeapon->Reload();
+}
+
+void AGunsCharacter::StartAim()
+{
+    bIsAiming = true;
+    UE_LOG(LogTemplateCharacter, Log, TEXT("[Input] StartAim (ADS 진입)"));
+}
+
+void AGunsCharacter::StopAim()
+{
+    bIsAiming = false;
+    UE_LOG(LogTemplateCharacter, Log, TEXT("[Input] StopAim (ADS 해제)"));
 }

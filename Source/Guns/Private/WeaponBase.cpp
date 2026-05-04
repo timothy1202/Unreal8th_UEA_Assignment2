@@ -21,7 +21,6 @@ AWeaponBase::AWeaponBase()
 
     MuzzlePoint = CreateDefaultSubobject<USceneComponent>(TEXT("MuzzlePoint"));
     MuzzlePoint->SetupAttachment(WeaponMesh);
-    // 에디터에서 MuzzlePoint를 총구 끝으로 위치 조정할 것
 }
 
 void AWeaponBase::BeginPlay()
@@ -48,15 +47,11 @@ void AWeaponBase::Fire()
         UE_LOG(LogWeapon, Verbose, TEXT("[%s] 발사 차단: 쿨다운"), *GetName());
         return;
     }
-
     if (CurrentAmmo <= 0)
     {
         UE_LOG(LogWeapon, Warning, TEXT("[%s] 탄창 비어있음 → 자동 재장전"), *GetName());
-
         if (EmptySound)
-        {
             UGameplayStatics::PlaySoundAtLocation(this, EmptySound, GetActorLocation());
-        }
         Reload();
         return;
     }
@@ -64,6 +59,9 @@ void AWeaponBase::Fire()
     PerformFire();
 }
 
+// ============================================================
+//  [템플릿 메서드] 발사 알고리즘의 골격 — 순서 변경 금지
+// ============================================================
 void AWeaponBase::PerformFire()
 {
     if (!OwnerCharacter)
@@ -79,87 +77,54 @@ void AWeaponBase::PerformFire()
         return;
     }
 
-    // 탄약 감소
-    CurrentAmmo--;
+    // ── Step 1: 발사 전 처리 (훅) ──────────────────────────
+    OnBeforeFire();
 
+    // ── Step 2: 탄약 소모 & 쿨다운 ────────────────────────
+    CurrentAmmo--;
     UE_LOG(LogWeapon, Log,
         TEXT("[%s] 발사! 남은 탄약: %d/%d | 펠릿 %d발 발사"),
         *GetName(), CurrentAmmo, MagazineSize, PelletCount);
 
-    // 발사 쿨다운
     bCanFire = false;
     GetWorldTimerManager().SetTimer(
         FireRateTimerHandle, this, &AWeaponBase::ResetFireCooldown, FireRate, false);
 
+    // ── Step 3: 레이캐스트 (자식 구현) ─────────────────────
     FVector  CamLoc;
     FRotator CamRot;
     PC->GetPlayerViewPoint(CamLoc, CamRot);
 
-    int32 HitCount = 0;
-
-    for (int32 i = 0; i < PelletCount; i++)
-    {
-        FRotator SpreadRot = CamRot;
-        SpreadRot.Pitch += FMath::RandRange(-SpreadAngle, SpreadAngle);
-        SpreadRot.Yaw   += FMath::RandRange(-SpreadAngle, SpreadAngle);
-
-        FVector Direction  = SpreadRot.Vector();
-        FVector TraceStart = CamLoc;
-        FVector TraceEnd   = CamLoc + Direction * MaxRange;
-
-        FHitResult Hit;
-        FCollisionQueryParams QueryParams;
-        QueryParams.AddIgnoredActor(this);
-        QueryParams.AddIgnoredActor(OwnerCharacter);
-        QueryParams.bTraceComplex = false;
-        QueryParams.bReturnPhysicalMaterial = true;
-
-        bool bHit = GetWorld()->LineTraceSingleByChannel(
-            Hit, TraceStart, TraceEnd, ECC_Pawn, QueryParams);
-
-        DrawDebugLine(GetWorld(), TraceStart,
-            bHit ? Hit.ImpactPoint : TraceEnd,
-            FColor::Orange, false, 0.5f, 0, 1.5f);
-
-        if (bHit && Hit.GetActor())
-        {
-            HitCount++;
-
-            UE_LOG(LogWeapon, Warning,
-                TEXT("  └ 펠릿 #%d 명중: %s (Class:%s) | 거리:%.0f | 데미지:%.1f"),
-                i + 1, *Hit.GetActor()->GetName(),
-                *Hit.GetActor()->GetClass()->GetName(),
-                Hit.Distance, Damage);
-
-            float Applied = UGameplayStatics::ApplyPointDamage(
-                Hit.GetActor(), Damage, Direction, Hit, PC, this,
-                UDamageType::StaticClass());
-
-            UE_LOG(LogWeapon, Warning,
-                TEXT("  └ ApplyPointDamage 반환값: %.1f"), Applied);
-
-            if (ImpactEffect)
-            {
-                UGameplayStatics::SpawnEmitterAtLocation(
-                    GetWorld(), ImpactEffect,
-                    Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
-            }
-        }
-    }
+    int32 HitCount = DoFireTrace(PC, CamLoc, CamRot);
 
     UE_LOG(LogWeapon, Log,
         TEXT("[%s] 발사 결과: %d/%d 펠릿 명중 (총 데미지 %.1f)"),
         *GetName(), HitCount, PelletCount, HitCount * Damage);
 
-    if (MuzzleFlashEffect && MuzzlePoint)
+    // ── Step 4: 레이캐스트 후처리 (훅) ────────────────────
+    OnAfterFireTrace(HitCount);
+
+    // ── Step 5: 이펙트 재생 (훅, 기본 구현 제공) ──────────
+    PlayFireEffects(PC);
+
+    // ── Step 6: 반동 (훅, 기본 구현 제공) ─────────────────
+    ApplyRecoil();
+
+    // ── Step 7: 탄창 소진 시 자동 재장전 ─────────────────
+    if (CurrentAmmo <= 0)
     {
-        UGameplayStatics::SpawnEmitterAttached(MuzzleFlashEffect, MuzzlePoint);
+        UE_LOG(LogWeapon, Log, TEXT("[%s] 마지막 탄 발사 → 다음 틱에 자동 재장전"), *GetName());
+        GetWorldTimerManager().SetTimerForNextTick([this]() { Reload(); });
     }
+}
+
+void AWeaponBase::PlayFireEffects(APlayerController* PC)
+{
+    if (MuzzleFlashEffect && MuzzlePoint)
+        UGameplayStatics::SpawnEmitterAttached(MuzzleFlashEffect, MuzzlePoint);
 
     if (FireSound)
-    {
         UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
-    }
 
     if (CameraShakeClass)
     {
@@ -167,16 +132,13 @@ void AWeaponBase::PerformFire()
         UE_LOG(LogWeapon, Verbose, TEXT("[%s] 카메라 쉐이크 적용 (강도:%.1f)"),
             *GetName(), CameraShakeIntensity);
     }
+}
 
+void AWeaponBase::ApplyRecoil()
+{
     if (AGunsCharacter* SChar = Cast<AGunsCharacter>(OwnerCharacter))
     {
         SChar->AddRecoil(RecoilStrength, RecoilPitchMax, RecoilYawRandom);
-    }
-
-    if (CurrentAmmo <= 0)
-    {
-        UE_LOG(LogWeapon, Log, TEXT("[%s] 마지막 탄 발사 → 다음 틱에 자동 재장전"), *GetName());
-        GetWorldTimerManager().SetTimerForNextTick([this]() { Reload(); });
     }
 }
 
@@ -194,15 +156,12 @@ void AWeaponBase::Reload()
     }
 
     bIsReloading = true;
-
     UE_LOG(LogWeapon, Log,
         TEXT("[%s] 재장전 시작 (%.1f초) | 현재:%d/%d"),
         *GetName(), ReloadTime, CurrentAmmo, MagazineSize);
 
     if (ReloadSound)
-    {
         UGameplayStatics::PlaySoundAtLocation(this, ReloadSound, GetActorLocation());
-    }
 
     GetWorldTimerManager().SetTimer(
         ReloadTimerHandle, this, &AWeaponBase::OnReloadComplete, ReloadTime, false);
@@ -212,7 +171,6 @@ void AWeaponBase::OnReloadComplete()
 {
     CurrentAmmo  = MagazineSize;
     bIsReloading = false;
-
     UE_LOG(LogWeapon, Log,
         TEXT("[%s] 재장전 완료! 탄약 %d/%d"),
         *GetName(), CurrentAmmo, MagazineSize);
